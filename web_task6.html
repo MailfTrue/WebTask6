@@ -1,0 +1,292 @@
+<html>
+   <head>
+      <title>Canvas & Mootools</title>
+      <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mootools/1.6.0/mootools-core.js"></script>
+      <script type="text/javascript">
+         var canvas, ctx, balls, idTimer;
+         var mode = 0; // 0 - стоп, 1 - вверх, 2 - вниз, 3 - вправо, 4 - влево, 5 - рандом, 6 - хаос
+         var burst_size = 100; // Размер взрыва
+         TBall = new Class({
+         	initialize: function(pX,pY) {
+         		this.posX = pX; //позиция шарика по X
+         		this.posY = pY; //позиция шарика по Y
+         		if (mode < 5)
+         			this.direction = mode;
+         		else if (mode === 5)
+         			this.setRandomDirection();
+         
+         		this.kind = ['ball', 'rect'][Math.round(Math.random())];
+         
+         		if (this.kind === 'ball') {
+         			//цвет шарика, формируется случайным оьразом
+         			this.colBall = 'rgb('+Math.floor(Math.random()*256)+','
+         			+Math.floor(Math.random()*256)+','+Math.floor(Math.random()*256)+')';
+         			// радиус шарика, случайное число от 5 до 30
+         			this.rBall = 5+Math.random()*25;
+         		} else if (this.kind === 'rect') {
+         			this.height = 10 + Math.random() * 30;
+         			this.width = 10 + Math.random() * 30;
+         			this.colRect = 'rgb('+Math.floor(Math.random()*256)+','
+         			+Math.floor(Math.random()*256)+','+Math.floor(Math.random()*256)+')';
+         		}
+         		this.increase_rate = 1 + (Math.random() / 30);
+         	},
+         	posX: 0,
+         	posY: 0,
+         	colBall:"rgb(0,0,0)",
+         	colRect:"rgb(0,0,0)",
+         	rBall: 0,
+         	height: 0,
+         	width: 0,
+         	direction: 0, // 0 - стоп, 1 - вверх, 2 - вниз, 3 - вправо, 4 - влево
+         	speed: 1,
+         	kind: 'rect',
+         	increase_rate: 1,
+         	colorBall: function(ctx){
+         		// формируем градиентную заливку для шарика
+         		with (this){
+         			var gradient = ctx.createRadialGradient(posX+rBall/4,
+         			posY-rBall/6, rBall/8, posX, posY, rBall);
+         			gradient.addColorStop(0, '#fff');
+         			gradient.addColorStop(0.85, colBall);
+         			return gradient;
+         		}
+         	},
+         	colorRect: function(ctx){
+         		// формируем градиентную заливку для прямоугольника
+         		with (this){
+         			var gradient = ctx.createLinearGradient(posX, posY, posX + width, posY + height);
+         			gradient.addColorStop(0, '#fff');
+         			gradient.addColorStop(0.85, colRect);
+         			return gradient;
+         		}
+         	},
+         	draw : function(ctx){
+         		// рисуем шарик на canvas
+         		with (this){
+         			ctx.beginPath();
+         			if (kind === 'ball') {
+         				ctx.fillStyle = colorBall(ctx);
+         				ctx.arc(posX, posY, rBall, 0, 2*Math.PI, false);
+         			} else if (kind === 'rect') {
+         				ctx.fillStyle = colorRect(ctx);
+         				ctx.rect(posX, posY, width, height);
+         			}
+         			ctx.closePath();
+         			ctx.fill();
+         		}
+         	},
+         	move(ctx) {
+         		with (this) {
+         			var x_delta = 0, y_delta = 0;
+         			delta = {
+         				1: [Math.random()*4-2, Math.random()*2-4],
+         				2: [Math.random()*4-2, -(Math.random()*2-4)],
+         				3: [Math.random()*4, Math.random()*4-2],
+         				4: [-(Math.random()*4), Math.random()*4-2]
+         			}[direction]
+         			if (delta) {
+         				posX += delta[0] * speed;
+         				posY += delta[1] * speed;
+         
+         				rBall *= increase_rate;
+         				height *= increase_rate;
+         				width *= increase_rate;
+         			}
+         
+         			draw(ctx);
+         		}
+         	},
+         	setRandomDirection() {
+         		this.direction = Math.floor(Math.random() * 4) + 1;
+         	}
+         });
+         function drawBack(ctx,col1,col2,w,h){
+         	// закрашиваем канвас градиентным фоном
+         	ctx.save();
+         	var g = ctx.createLinearGradient(0,0,0,h);
+         	g.addColorStop(1,col1);
+         	g.addColorStop(0,col2);
+         	ctx.fillStyle = g;
+         	ctx.fillRect(0,0,w,h);
+         	ctx.restore();
+         }
+         // инициализация работы
+         function init(){
+         	canvas = document.getElementById('canvas');
+         	if (canvas.getContext){
+         		ctx = canvas.getContext('2d');
+         		//рисуем фон
+         		drawBack(ctx,'#202020','#aaa',canvas.width,canvas.height);
+         		//создаем 10 шариков, заноси их в массив и выводим на canvas
+         		balls = [];
+         		for (var i = 1; i<=10;i++){
+         			var item = new TBall(10+Math.random()*(canvas.width-30),
+         			10+Math.random()*(canvas.height-30));
+         			item.draw(ctx);
+         			balls.push(item);
+         		}
+         	}
+         
+         	var rad = document.querySelectorAll('#mode_radio input');
+         	for (var i = 0; i < rad.length; i++) {
+         	    rad[i].addEventListener('change', function() {
+         	    	setMode(this.value);
+         	    });
+         	}
+         	move();
+         }
+         function setDirection(direction) {
+         	for (var i = 0; i < balls.length; i++)
+         		balls[i].direction = direction;
+         }
+         function setRandomDirectionAll() {
+         	for (var i = 0; i < balls.length; i++) {
+         		balls[i].setRandomDirection();
+         	}
+         }
+         function setMode(new_mode) {
+         	mode = Number.parseInt(new_mode);
+         	if (mode < 5)
+         		setDirection(mode)
+         	else if (mode === 5) {
+         		setRandomDirectionAll();
+         	}
+         }
+         // создаем новый шарик по щелчку мыши, добавляем его в массив шариков и рисуем его
+         function goInput(event){
+         	var x = event.clientX;
+         	var y = event.clientY;
+         	var item = new TBall(x,y);
+         	item.draw(ctx);
+         	balls.push(item);
+         }
+         function moveBall(){
+         	//реализация движения шариков, находящихся в массиве balls
+         	let currSpeed = Number.parseInt(document.querySelector('input[name=speed]').value) / 10;
+         	drawBack(ctx,'#202020','#aaa',canvas.width,canvas.height);
+         	if (mode === 6)
+         		setRandomDirectionAll(); 
+         	deleteCollided();
+         	for (var i = 0; i < balls.length; i) {
+         		balls[i].speed = currSpeed;
+         		balls[i].move(ctx);
+         		var out = (balls[i].posX > canvas.width)||(balls[i].posX < 0) ||(balls[i].posY < 0);
+         		var burst = (balls[i].rBall > burst_size) || (balls[i].width > burst_size) || (balls[i].height > burst_size);
+         		if (out || burst) 
+         			balls.splice(i, 1);
+         		else 
+         			i++;
+         	}
+         }
+         function move(){
+         	idTimer = setInterval('moveBall();', 50);
+         }
+         function deleteCollided() {
+         	for (var i = 0; i < balls.length; i++)
+         		for (var k = 0; k < balls.length; k++) {
+         			if (k === i) continue;
+         			var item1 = balls[i], item2 = balls[k];
+         			var collided = false;
+         			if (item1.kind === 'ball' && item2.kind === 'ball')
+         				if (isCollidedCircles(item1, item2))
+         					collided = true;
+         			if (item1.kind === 'rect' && item2.kind === 'rect')
+         				if (isCollidedRect(item1, item2))
+         					collided = true;
+         			if (item1.kind === 'rect' && item2.kind === 'ball')
+         				if (isCollededRectCircle(item1, item2))
+         					collided = true;
+         			if (item1.kind === 'ball' && item2.kind === 'rect')
+         				if (isCollededRectCircle(item2, item1))
+         					collided = true;
+         			if (collided) {
+         				balls.splice(i, 1);
+     					balls.splice(k-1, 1);
+         			}
+         		}
+         }
+         function isCollidedCircles(circle0, circle1)
+         {
+               var maxDistance = circle0.rBall + circle1.rBall;
+               
+               var dx = circle0.posX - circle1.posX;
+               var dy = circle0.posY - circle1.posY;
+               
+               var currentDistance = Math.sqrt(dx * dx + dy * dy);
+               
+               return currentDistance < maxDistance;
+         }
+         function isCollidedRect(rect0, rect1) {
+         	var a = {x: rect0.posX, y: rect0.posY, x1: rect0.posX + rect0.width, y1: rect0.posY + rect0.height};
+         	var b = {x: rect1.posX, y: rect1.posY, x1: rect1.posX + rect1.width, y1: rect1.posY + rect1.height};
+           return(
+             (
+               (
+                 ( a.x>=b.x && a.x<=b.x1 )||( a.x1>=b.x && a.x1<=b.x1  )
+               ) && (
+                 ( a.y>=b.y && a.y<=b.y1 )||( a.y1>=b.y && a.y1<=b.y1 )
+               )
+             )||(
+               (
+                 ( b.x>=a.x && b.x<=a.x1 )||( b.x1>=a.x && b.x1<=a.x1  )
+               ) && (
+                 ( b.y>=a.y && b.y<=a.y1 )||( b.y1>=a.y && b.y1<=a.y1 )
+               )
+             )
+           )||(
+             (
+               (
+                 ( a.x>=b.x && a.x<=b.x1 )||( a.x1>=b.x && a.x1<=b.x1  )
+               ) && (
+                 ( b.y>=a.y && b.y<=a.y1 )||( b.y1>=a.y && b.y1<=a.y1 )
+               )
+             )||(
+               (
+                 ( b.x>=a.x && b.x<=a.x1 )||( b.x1>=a.x && b.x1<=a.x1  )
+               ) && (
+                 ( a.y>=b.y && a.y<=b.y1 )||( a.y1>=b.y && a.y1<=b.y1 )
+               )
+             )
+           );
+         }
+         function isCollededRectCircle(rect, circle) {
+         	var distX = Math.abs(circle.posX - rect.posX-rect.width/2);
+    		var distY = Math.abs(circle.posY - rect.posY-rect.height/2);
+    		if (distX > (rect.width/2 + circle.rBall)) { return false; }
+    		if (distY > (rect.h/2 + circle.rBall)) { return false; }
+    		if (distX <= (rect.width/2)) { return true; } 
+    		if (distY <= (rect.height/2)) { return true; }
+    		var dx=distX-rect.width/2;
+    		var dy=distY-rect.height/2;
+    		return (dx*dx+dy*dy<=(circle.rBall*circle.rBall));
+         }
+      </script>
+      <style type="text/css">
+         canvas { border: 1px solid blue; }
+      </style>
+   </head>
+   <body onload="init();">
+      <canvas id="canvas" width="600" height="400" onclick="goInput(event);">
+      </canvas>
+      <form>
+         <input type="range" name="speed" value="10" min="1" max="100">
+         <p id="mode_radio">
+            <input type="radio" id="mode_0" name="mode" value="0" checked="">
+            <label for="mode_0">Стоп</label><br>
+            <input type="radio" id="mode_1" name="mode" value="1">
+            <label for="mode_1">Вверх</label><br>
+            <input type="radio" id="mode_2" name="mode" value="2">
+            <label for="mode_2">Вниз</label><br>
+            <input type="radio" id="mode_3" name="mode" value="3">
+            <label for="mode_3">Вправо</label><br>
+            <input type="radio" id="mode_4" name="mode" value="4">
+            <label for="mode_4">Влево</label><br>
+            <input type="radio" id="mode_5" name="mode" value="5">
+            <label for="mode_5">Рандом</label><br>
+            <input type="radio" id="mode_6" name="mode" value="6">
+            <label for="mode_6">Хаос</label>
+         </p>
+      </form>
+   </body>
+</html>
